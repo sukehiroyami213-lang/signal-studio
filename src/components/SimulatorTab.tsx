@@ -135,6 +135,11 @@ const SimulatorTab = () => {
 
   const gridStroke = "hsl(222,25%,16%)";
   const tickStyle = { fontSize: 10, fill: "hsl(215,20%,45%)" };
+  const activeSignalKey = SIGNAL_CONFIGS[activeTimePlot].key;
+  const visibleTimeWindowMs = activeSignalKey === "message" ? 5 : 0.2;
+  const activeTimeData = results
+    ? results[activeSignalKey].filter((point) => point.time <= visibleTimeWindowMs)
+    : [];
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6">
