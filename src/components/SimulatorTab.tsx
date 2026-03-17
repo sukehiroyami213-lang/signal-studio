@@ -265,9 +265,12 @@ const SimulatorTab = () => {
                   <div className="mb-2 flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
                     <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
+                    <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Showing 0–{visibleTimeWindowMs} ms
+                    </span>
                   </div>
                   <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={results[SIGNAL_CONFIGS[activeTimePlot].key]}>
+                    <AreaChart data={activeTimeData}>
                       <defs>
                         <linearGradient id="gradMessage" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#4fc3f7" stopOpacity={0.3} />
@@ -287,8 +290,8 @@ const SimulatorTab = () => {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                      <XAxis dataKey="time" tick={tickStyle}
-                        label={{ value: "Time (ms)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
+                      <XAxis dataKey="time" tick={tickStyle} domain={[0, visibleTimeWindowMs]} type="number"
+                        label={{ value: activeSignalKey === "message" ? "Time (ms)" : "Time (ms, zoomed)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
                       <YAxis tick={tickStyle} />
                       <Tooltip
                         contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 12 }}
