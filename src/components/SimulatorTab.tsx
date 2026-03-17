@@ -261,7 +261,7 @@ const SimulatorTab = () => {
                     <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
                     <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={results[SIGNAL_CONFIGS[activeTimePlot].key]}>
                       <defs>
                         <linearGradient id="gradMessage" x1="0" y1="0" x2="0" y2="1">
