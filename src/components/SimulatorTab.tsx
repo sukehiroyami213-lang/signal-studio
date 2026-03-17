@@ -306,7 +306,7 @@ const SimulatorTab = () => {
             </div>
 
             {!results ? <EmptyPlot /> : (
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
                 {SPECTRUM_CONFIGS.map(({ key, label, color }) => (
                   <motion.div key={key} className="rounded-lg bg-secondary/20 p-3"
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
