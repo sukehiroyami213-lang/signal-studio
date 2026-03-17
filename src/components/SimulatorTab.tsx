@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area,
 } from "recharts";
 import {
   generateTimeArray, messageSignal, carrierSignal, dsbSignal, ssbSignal, vsbSignal,
@@ -9,13 +10,86 @@ import {
 } from "@/lib/signalProcessing";
 
 const STEPS = [
-  { label: "Step 1", title: "Config L1/L2", desc: "Use sliders to set carrier frequency and signal components." },
-  { label: "Step 2", title: "Add Dropout", desc: "Enable Dropout to set vestige width for VSB filtering." },
-  { label: "Step 3", title: "Run Training", desc: 'Click "Simulate" to generate time and frequency plots.' },
-  { label: "Step 4", title: "Analyze", desc: "Compare DSB-SC, SSB, and VSB in both domains." },
+  { label: "Step 1", title: "Set Frequencies", desc: "Adjust f₁, f₂ and carrier frequency using the sliders.", icon: "🎛️" },
+  { label: "Step 2", title: "Configure VSB", desc: "Set the vestige bandwidth for VSB filtering.", icon: "📐" },
+  { label: "Step 3", title: "Simulate", desc: 'Click "Run Simulation" to compute all signals.', icon: "▶️" },
+  { label: "Step 4", title: "Analyze", desc: "Compare DSB-SC, SSB, and VSB in time & frequency.", icon: "📊" },
 ];
 
-const stepColors = ["hsl(var(--step-1))", "hsl(var(--step-2))", "hsl(var(--step-3))", "hsl(var(--step-4))"];
+const SIGNAL_CONFIGS = [
+  { key: "message", label: "Message Signal m(t)", color: "#4fc3f7", gradient: "url(#gradMessage)" },
+  { key: "dsb", label: "DSB-SC Signal", color: "#a78bfa", gradient: "url(#gradDsb)" },
+  { key: "ssb", label: "SSB Signal", color: "#f87171", gradient: "url(#gradSsb)" },
+  { key: "vsb", label: "VSB Signal", color: "#34d399", gradient: "url(#gradVsb)" },
+] as const;
+
+const SPECTRUM_CONFIGS = [
+  { key: "dsbSpectrum", label: "DSB-SC Spectrum", color: "#a78bfa" },
+  { key: "ssbSpectrum", label: "SSB Spectrum", color: "#f87171" },
+  { key: "vsbSpectrum", label: "VSB Spectrum", color: "#34d399" },
+] as const;
+
+interface SliderProps {
+  label: string;
+  sublabel?: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  color?: string;
+  onChange: (v: number) => void;
+}
+
+const ParamSlider = ({ label, sublabel, value, min, max, step, unit = "Hz", color = "hsl(var(--primary))", onChange }: SliderProps) => (
+  <div className="group">
+    <div className="mb-2 flex items-baseline justify-between">
+      <div>
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        {sublabel && <span className="ml-2 text-xs text-muted-foreground">{sublabel}</span>}
+      </div>
+      <div className="flex items-center gap-1.5 rounded-md bg-secondary/80 px-3 py-1">
+        <span className="font-mono text-sm font-semibold text-foreground">{value.toLocaleString()}</span>
+        <span className="text-xs text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+    <div className="relative">
+      <div className="absolute top-1/2 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full transition-all duration-150"
+          style={{
+            width: `${((value - min) / (max - min)) * 100}%`,
+            background: `linear-gradient(90deg, ${color}, ${color}88)`,
+          }}
+        />
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(+e.target.value)}
+        className="relative z-10 w-full cursor-pointer appearance-none bg-transparent
+          [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none
+          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2
+          [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:bg-foreground
+          [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-transform
+          [&::-webkit-slider-thumb]:hover:scale-125"
+      />
+    </div>
+    <div className="mt-1 flex justify-between text-[10px] text-muted-foreground/50">
+      <span>{min.toLocaleString()}</span>
+      <span>{max.toLocaleString()}</span>
+    </div>
+  </div>
+);
+
+const EmptyPlot = () => (
+  <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center">
+    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary/50 text-2xl">
+      📈
+    </div>
+    <p className="text-sm font-medium text-muted-foreground">No signals generated yet</p>
+    <p className="text-xs text-muted-foreground/60">Adjust parameters and click "Run Simulation"</p>
+  </div>
+);
 
 const SimulatorTab = () => {
   const [f1, setF1] = useState(1000);
@@ -24,6 +98,7 @@ const SimulatorTab = () => {
   const [vestigeWidth, setVestigeWidth] = useState(3000);
   const [Ac] = useState(10);
   const [simulated, setSimulated] = useState(false);
+  const [activeTimePlot, setActiveTimePlot] = useState<number>(0);
 
   const fs = 500000;
   const duration = 0.005;
@@ -50,140 +125,220 @@ const SimulatorTab = () => {
   }, [simulated, f1, f2, fc, vestigeWidth, Ac]);
 
   const handleSimulate = useCallback(() => setSimulated(true), []);
+  const handleParamChange = (setter: (v: number) => void) => (v: number) => {
+    setter(v);
+    setSimulated(false);
+  };
 
   const spectrumToChart = (spec: { freq: number[]; mag: number[] }) =>
-    spec.freq.map((f, i) => ({ freq: f / 1000, mag: spec.mag[i] }));
+    spec.freq.map((f, i) => ({ freq: Math.round(f / 100) / 10, mag: Math.round(spec.mag[i] * 1000) / 1000 }));
+
+  const gridStroke = "hsl(222,25%,16%)";
+  const tickStyle = { fontSize: 10, fill: "hsl(215,20%,45%)" };
 
   return (
-    <div className="container mx-auto max-w-6xl px-6 py-10">
-      {/* How to use */}
-      <motion.div className="card-dashed mb-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <h2 className="text-xl font-bold text-foreground">📖 How to use the Simulator</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-4">
+    <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      {/* Steps */}
+      <motion.div className="mb-8" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {STEPS.map((s, i) => (
-            <div key={i} className="card-dashed">
-              <span className="step-badge" style={{ background: `${stepColors[i]}22`, color: stepColors[i] }}>
+            <div
+              key={i}
+              className="group relative overflow-hidden rounded-xl border border-border/60 bg-card/50 p-4 transition-colors hover:border-primary/30 hover:bg-card"
+            >
+              <div className="absolute -right-2 -top-2 text-3xl opacity-10 transition-opacity group-hover:opacity-20">
+                {s.icon}
+              </div>
+              <span className="inline-block rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                 {s.label}
               </span>
-              <h3 className="mt-3 font-bold text-foreground">{s.title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{s.desc}</p>
+              <h3 className="mt-2 text-sm font-bold text-foreground">{s.title}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
             </div>
           ))}
         </div>
       </motion.div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Parameter Tuning */}
-        <div className="card-dashed space-y-6">
-          <h2 className="text-xl font-bold text-foreground">Parameter Tuning</h2>
-          <hr className="border-border" />
+      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+        {/* Parameter Panel */}
+        <motion.div
+          className="space-y-1 rounded-xl border border-border/60 bg-card/80 p-5"
+          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-sm">🎛️</div>
+            <h2 className="text-lg font-bold text-foreground">Parameters</h2>
+          </div>
+          <p className="pb-3 text-xs text-muted-foreground">Configure signal and modulation parameters</p>
 
-          <div>
-            <label className="text-sm text-muted-foreground">f₁ - Signal Component 1 (Hz)</label>
-            <div className="mt-2 flex items-center gap-4">
-              <input type="range" min={100} max={10000} step={100} value={f1}
-                onChange={e => { setF1(+e.target.value); setSimulated(false); }}
-                className="flex-1 accent-primary" />
-              <span className="w-20 rounded bg-secondary px-2 py-1 text-center font-mono text-sm text-foreground">{f1}</span>
+          <div className="space-y-5">
+            <div className="rounded-lg bg-secondary/30 p-4 space-y-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Signal Components</p>
+              <ParamSlider label="f₁" sublabel="Component 1" value={f1} min={100} max={10000} step={100}
+                color="#4fc3f7" onChange={handleParamChange(setF1)} />
+              <ParamSlider label="f₂" sublabel="Component 2" value={f2} min={100} max={10000} step={100}
+                color="#4fc3f7" onChange={handleParamChange(setF2)} />
+            </div>
+
+            <div className="rounded-lg bg-secondary/30 p-4 space-y-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Carrier</p>
+              <ParamSlider label="fₓ" sublabel="Carrier Freq" value={fc} min={10000} max={100000} step={1000}
+                color="#a78bfa" onChange={handleParamChange(setFc)} />
+            </div>
+
+            <div className="rounded-lg border border-dashed border-primary/25 bg-primary/5 p-4 space-y-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/70">VSB Vestige</p>
+              <ParamSlider label="fᵥ" sublabel="Vestige Width" value={vestigeWidth} min={500} max={10000} step={500}
+                color="#34d399" onChange={handleParamChange(setVestigeWidth)} />
             </div>
           </div>
 
-          <div>
-            <label className="text-sm text-muted-foreground">f₂ - Signal Component 2 (Hz)</label>
-            <div className="mt-2 flex items-center gap-4">
-              <input type="range" min={100} max={10000} step={100} value={f2}
-                onChange={e => { setF2(+e.target.value); setSimulated(false); }}
-                className="flex-1 accent-primary" />
-              <span className="w-20 rounded bg-secondary px-2 py-1 text-center font-mono text-sm text-foreground">{f2}</span>
-            </div>
+          <div className="pt-4">
+            <button
+              onClick={handleSimulate}
+              className="group relative w-full overflow-hidden rounded-xl bg-primary py-3.5 font-bold text-primary-foreground transition-all hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                <span>▶</span> Run Simulation
+              </span>
+            </button>
           </div>
 
-          <div>
-            <label className="text-sm text-muted-foreground">Carrier Frequency f_c (Hz)</label>
-            <div className="mt-2 flex items-center gap-4">
-              <input type="range" min={10000} max={100000} step={1000} value={fc}
-                onChange={e => { setFc(+e.target.value); setSimulated(false); }}
-                className="flex-1 accent-primary" />
-              <span className="w-20 rounded bg-secondary px-2 py-1 text-center font-mono text-sm text-foreground">{fc}</span>
-            </div>
-          </div>
-
-          <div className="card-dashed">
-            <label className="text-sm text-muted-foreground">Vestige Width f_v (Hz)</label>
-            <div className="mt-2 flex items-center gap-4">
-              <input type="range" min={500} max={10000} step={500} value={vestigeWidth}
-                onChange={e => { setVestigeWidth(+e.target.value); setSimulated(false); }}
-                className="flex-1 accent-primary" />
-              <span className="w-20 rounded bg-secondary px-2 py-1 text-center font-mono text-sm text-foreground">{vestigeWidth}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSimulate}
-            className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Simulate
-          </button>
-        </div>
-
-        {/* Time Domain Plots */}
-        <div className="card-dashed">
-          <h2 className="text-xl font-bold text-foreground">Time Domain Signals</h2>
-          {!results ? (
-            <p className="mt-8 text-center text-muted-foreground">Click "Simulate" to generate plots</p>
-          ) : (
-            <div className="mt-4 space-y-6">
-              {([
-                { data: results.message, label: "Message Signal", color: "#4fc3f7" },
-                { data: results.dsb, label: "DSB-SC", color: "#7c4dff" },
-                { data: results.ssb, label: "SSB", color: "#ff5252" },
-                { data: results.vsb, label: "VSB", color: "#69f0ae" },
-              ] as const).map(({ data, label, color }) => (
-                <div key={label}>
-                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{label}</h3>
-                  <ResponsiveContainer width="100%" height={120}>
-                    <LineChart data={data}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(222,30%,20%)" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} />
-                      <YAxis tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} />
-                      <Line type="monotone" dataKey="value" stroke={color} dot={false} strokeWidth={1.5} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Frequency Domain */}
-      {results && (
-        <motion.div className="mt-8 card-dashed" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="text-xl font-bold text-foreground">Frequency Spectrum</h2>
-          <div className="mt-4 grid gap-6 lg:grid-cols-3">
-            {([
-              { spec: results.dsbSpectrum, label: "DSB-SC Spectrum", color: "#7c4dff" },
-              { spec: results.ssbSpectrum, label: "SSB Spectrum", color: "#ff5252" },
-              { spec: results.vsbSpectrum, label: "VSB Spectrum", color: "#69f0ae" },
-            ] as const).map(({ spec, label, color }) => (
-              <div key={label}>
-                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{label}</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={spectrumToChart(spec)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(222,30%,20%)" />
-                    <XAxis dataKey="freq" tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }}
-                      label={{ value: "Freq (kHz)", position: "insideBottom", offset: -5, fontSize: 10, fill: "hsl(215,20%,55%)" }} />
-                    <YAxis tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} />
-                    <Tooltip contentStyle={{ background: "hsl(222,47%,11%)", border: "1px solid hsl(222,30%,20%)" }} />
-                    <Legend />
-                    <Line type="monotone" dataKey="mag" name="Magnitude" stroke={color} dot={false} strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
+          {/* Live info */}
+          <div className="pt-3">
+            <div className="rounded-lg bg-secondary/30 p-3 text-xs text-muted-foreground space-y-1.5">
+              <div className="flex justify-between">
+                <span>Message BW</span>
+                <span className="font-mono text-foreground">{Math.max(f1, f2).toLocaleString()} Hz</span>
               </div>
-            ))}
+              <div className="flex justify-between">
+                <span>DSB-SC BW</span>
+                <span className="font-mono text-foreground">{(2 * Math.max(f1, f2)).toLocaleString()} Hz</span>
+              </div>
+              <div className="flex justify-between">
+                <span>SSB BW</span>
+                <span className="font-mono text-foreground">{Math.max(f1, f2).toLocaleString()} Hz</span>
+              </div>
+              <div className="flex justify-between">
+                <span>VSB BW</span>
+                <span className="font-mono font-semibold text-primary">{(Math.max(f1, f2) + vestigeWidth).toLocaleString()} Hz</span>
+              </div>
+            </div>
           </div>
         </motion.div>
-      )}
+
+        {/* Plots area */}
+        <motion.div className="space-y-6" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+          {/* Time Domain */}
+          <div className="rounded-xl border border-border/60 bg-card/80 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">⏱️</div>
+                <h2 className="text-lg font-bold text-foreground">Time Domain</h2>
+              </div>
+              {results && (
+                <div className="flex gap-1 rounded-lg bg-secondary/50 p-1">
+                  {SIGNAL_CONFIGS.map((s, i) => (
+                    <button key={s.key}
+                      onClick={() => setActiveTimePlot(i)}
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all ${
+                        activeTimePlot === i
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s.label.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!results ? <EmptyPlot /> : (
+              <AnimatePresence mode="wait">
+                <motion.div key={activeTimePlot} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
+                    <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={results[SIGNAL_CONFIGS[activeTimePlot].key]}>
+                      <defs>
+                        <linearGradient id="gradMessage" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4fc3f7" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#4fc3f7" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gradDsb" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gradSsb" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f87171" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#f87171" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gradVsb" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                      <XAxis dataKey="time" tick={tickStyle}
+                        label={{ value: "Time (ms)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
+                      <YAxis tick={tickStyle} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 12 }}
+                        labelStyle={{ color: "hsl(215,20%,55%)" }}
+                      />
+                      <Area type="monotone" dataKey="value" stroke={SIGNAL_CONFIGS[activeTimePlot].color}
+                        fill={SIGNAL_CONFIGS[activeTimePlot].gradient} strokeWidth={1.5} dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+
+          {/* Frequency Spectrum */}
+          <div className="rounded-xl border border-border/60 bg-card/80 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
+              <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
+            </div>
+
+            {!results ? <EmptyPlot /> : (
+              <div className="grid gap-4 lg:grid-cols-3">
+                {SPECTRUM_CONFIGS.map(({ key, label, color }) => (
+                  <motion.div key={key} className="rounded-lg bg-secondary/20 p-3"
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ background: color }} />
+                      <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={spectrumToChart(results[key])}>
+                        <defs>
+                          <linearGradient id={`specGrad-${key}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+                            <stop offset="100%" stopColor={color} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                        <XAxis dataKey="freq" tick={{ fontSize: 9, fill: "hsl(215,20%,45%)" }}
+                          label={{ value: "kHz", position: "insideBottomRight", offset: -5, fontSize: 9, fill: "hsl(215,20%,45%)" }} />
+                        <YAxis tick={{ fontSize: 9, fill: "hsl(215,20%,45%)" }} />
+                        <Tooltip
+                          contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 11 }}
+                        />
+                        <Area type="monotone" dataKey="mag" stroke={color} fill={`url(#specGrad-${key})`} strokeWidth={1.5} dot={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };
