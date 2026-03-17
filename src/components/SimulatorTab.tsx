@@ -261,7 +261,7 @@ const SimulatorTab = () => {
                     <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
                     <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={results[SIGNAL_CONFIGS[activeTimePlot].key]}>
                       <defs>
                         <linearGradient id="gradMessage" x1="0" y1="0" x2="0" y2="1">
@@ -306,7 +306,7 @@ const SimulatorTab = () => {
             </div>
 
             {!results ? <EmptyPlot /> : (
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
                 {SPECTRUM_CONFIGS.map(({ key, label, color }) => (
                   <motion.div key={key} className="rounded-lg bg-secondary/20 p-3"
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -314,7 +314,7 @@ const SimulatorTab = () => {
                       <div className="h-2 w-2 rounded-full" style={{ background: color }} />
                       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
                     </div>
-                    <ResponsiveContainer width="100%" height={180}>
+                    <ResponsiveContainer width="100%" height={280}>
                       <AreaChart data={spectrumToChart(results[key])}>
                         <defs>
                           <linearGradient id={`specGrad-${key}`} x1="0" y1="0" x2="0" y2="1">
