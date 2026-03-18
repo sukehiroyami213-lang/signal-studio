@@ -91,6 +91,10 @@ const EmptyPlot = () => (
   </div>
 );
 
+const ZOOM_LEVELS_TIME_MESSAGE = [0.5, 1, 2, 3, 5];
+const ZOOM_LEVELS_TIME_MOD = [0.05, 0.1, 0.2, 0.5, 1];
+const ZOOM_LEVELS_FREQ = [10, 25, 50, 100, 250];
+
 const SimulatorTab = () => {
   const [f1, setF1] = useState(1000);
   const [f2, setF2] = useState(4000);
@@ -99,6 +103,8 @@ const SimulatorTab = () => {
   const [Ac] = useState(10);
   const [simulated, setSimulated] = useState(false);
   const [activeTimePlot, setActiveTimePlot] = useState<number>(0);
+  const [timeZoomIdx, setTimeZoomIdx] = useState(2); // default index into zoom levels
+  const [freqZoomIdx, setFreqZoomIdx] = useState(4); // default: show all
 
   const fs = 500000;
   const duration = 0.005;
@@ -136,10 +142,13 @@ const SimulatorTab = () => {
   const gridStroke = "hsl(222,25%,16%)";
   const tickStyle = { fontSize: 10, fill: "hsl(215,20%,45%)" };
   const activeSignalKey = SIGNAL_CONFIGS[activeTimePlot].key;
-  const visibleTimeWindowMs = activeSignalKey === "message" ? 5 : 0.2;
+  const isMessage = activeSignalKey === "message";
+  const zoomLevels = isMessage ? ZOOM_LEVELS_TIME_MESSAGE : ZOOM_LEVELS_TIME_MOD;
+  const visibleTimeWindowMs = zoomLevels[timeZoomIdx] ?? zoomLevels[2];
   const activeTimeData = results
     ? results[activeSignalKey].filter((point) => point.time <= visibleTimeWindowMs)
     : [];
+  const freqZoomMax = ZOOM_LEVELS_FREQ[freqZoomIdx] ?? 250;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6">
