@@ -388,8 +388,9 @@ const SimulatorTab = () => {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
                         <XAxis dataKey="freq" tick={{ fontSize: 9, fill: "hsl(215,20%,45%)" }}
-                          label={{ value: "kHz", position: "insideBottomRight", offset: -5, fontSize: 9, fill: "hsl(215,20%,45%)" }} />
-                        <YAxis tick={{ fontSize: 9, fill: "hsl(215,20%,45%)" }} />
+                          label={{ value: "Frequency (kHz)", position: "insideBottomRight", offset: -5, fontSize: 9, fill: "hsl(215,20%,45%)" }} />
+                        <YAxis tick={{ fontSize: 9, fill: "hsl(215,20%,45%)" }}
+                          label={{ value: "|X(f)|", angle: -90, position: "insideLeft", offset: 10, fontSize: 9, fill: "hsl(215,20%,45%)" }} />
                         <Tooltip
                           contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 11 }}
                         />
