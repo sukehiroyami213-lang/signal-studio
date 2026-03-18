@@ -103,8 +103,9 @@ const SimulatorTab = () => {
   const [Ac] = useState(10);
   const [simulated, setSimulated] = useState(false);
   const [activeTimePlot, setActiveTimePlot] = useState<number>(0);
-  const [timeZoomIdx, setTimeZoomIdx] = useState(2); // default index into zoom levels
-  const [freqZoomIdx, setFreqZoomIdx] = useState(4); // default: show all
+  const [timeZoomIdx, setTimeZoomIdx] = useState(2);
+  const [freqZoomIdx, setFreqZoomIdx] = useState(4);
+  const [spectrumView, setSpectrumView] = useState<"individual" | "overlay">("individual");
 
   const fs = 500000;
   const duration = 0.005;
