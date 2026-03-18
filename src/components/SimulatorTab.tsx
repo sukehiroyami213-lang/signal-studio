@@ -338,9 +338,32 @@ const SimulatorTab = () => {
 
           {/* Frequency Spectrum */}
           <div className="rounded-xl border border-border/60 bg-card/80 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
-              <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
+                <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
+              </div>
+              {results && (
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 text-[10px] text-muted-foreground">0–{freqZoomMax} kHz</span>
+                  <button
+                    onClick={() => setFreqZoomIdx(i => Math.max(0, i - 1))}
+                    disabled={freqZoomIdx === 0}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    title="Zoom in"
+                  >🔍+</button>
+                  <button
+                    onClick={() => setFreqZoomIdx(i => Math.min(ZOOM_LEVELS_FREQ.length - 1, i + 1))}
+                    disabled={freqZoomIdx === ZOOM_LEVELS_FREQ.length - 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    title="Zoom out"
+                  >🔍−</button>
+                  <button
+                    onClick={() => setFreqZoomIdx(4)}
+                    className="ml-1 rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >Reset</button>
+                </div>
+              )}
             </div>
 
             {!results ? <EmptyPlot /> : (
