@@ -91,6 +91,10 @@ const EmptyPlot = () => (
   </div>
 );
 
+const ZOOM_LEVELS_TIME_MESSAGE = [0.5, 1, 2, 3, 5];
+const ZOOM_LEVELS_TIME_MOD = [0.05, 0.1, 0.2, 0.5, 1];
+const ZOOM_LEVELS_FREQ = [10, 25, 50, 100, 250];
+
 const SimulatorTab = () => {
   const [f1, setF1] = useState(1000);
   const [f2, setF2] = useState(4000);
@@ -99,6 +103,8 @@ const SimulatorTab = () => {
   const [Ac] = useState(10);
   const [simulated, setSimulated] = useState(false);
   const [activeTimePlot, setActiveTimePlot] = useState<number>(0);
+  const [timeZoomIdx, setTimeZoomIdx] = useState(2); // default index into zoom levels
+  const [freqZoomIdx, setFreqZoomIdx] = useState(4); // default: show all
 
   const fs = 500000;
   const duration = 0.005;
@@ -131,15 +137,20 @@ const SimulatorTab = () => {
   };
 
   const spectrumToChart = (spec: { freq: number[]; mag: number[] }) =>
-    spec.freq.map((f, i) => ({ freq: Math.round(f / 100) / 10, mag: Math.round(spec.mag[i] * 1000) / 1000 }));
+    spec.freq
+      .map((f, i) => ({ freq: Math.round(f / 100) / 10, mag: Math.round(spec.mag[i] * 1000) / 1000 }))
+      .filter(p => p.freq <= freqZoomMax);
 
   const gridStroke = "hsl(222,25%,16%)";
   const tickStyle = { fontSize: 10, fill: "hsl(215,20%,45%)" };
   const activeSignalKey = SIGNAL_CONFIGS[activeTimePlot].key;
-  const visibleTimeWindowMs = activeSignalKey === "message" ? 5 : 0.2;
+  const isMessage = activeSignalKey === "message";
+  const zoomLevels = isMessage ? ZOOM_LEVELS_TIME_MESSAGE : ZOOM_LEVELS_TIME_MOD;
+  const visibleTimeWindowMs = zoomLevels[timeZoomIdx] ?? zoomLevels[2];
   const activeTimeData = results
     ? results[activeSignalKey].filter((point) => point.time <= visibleTimeWindowMs)
     : [];
+  const freqZoomMax = ZOOM_LEVELS_FREQ[freqZoomIdx] ?? 250;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -262,12 +273,33 @@ const SimulatorTab = () => {
             {!results ? <EmptyPlot /> : (
               <AnimatePresence mode="wait">
                 <motion.div key={activeTimePlot} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
-                    <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
-                    <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Showing 0–{visibleTimeWindowMs} ms
-                    </span>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
+                      <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
+                      <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        0–{visibleTimeWindowMs} ms
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setTimeZoomIdx(i => Math.max(0, i - 1))}
+                        disabled={timeZoomIdx === 0}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                        title="Zoom in"
+                      >🔍+</button>
+                      <button
+                        onClick={() => setTimeZoomIdx(i => Math.min(zoomLevels.length - 1, i + 1))}
+                        disabled={timeZoomIdx === zoomLevels.length - 1}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                        title="Zoom out"
+                      >🔍−</button>
+                      <button
+                        onClick={() => setTimeZoomIdx(2)}
+                        className="ml-1 rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        title="Reset zoom"
+                      >Reset</button>
+                    </div>
                   </div>
                   <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={activeTimeData}>
@@ -308,9 +340,32 @@ const SimulatorTab = () => {
 
           {/* Frequency Spectrum */}
           <div className="rounded-xl border border-border/60 bg-card/80 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
-              <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
+                <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
+              </div>
+              {results && (
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 text-[10px] text-muted-foreground">0–{freqZoomMax} kHz</span>
+                  <button
+                    onClick={() => setFreqZoomIdx(i => Math.max(0, i - 1))}
+                    disabled={freqZoomIdx === 0}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    title="Zoom in"
+                  >🔍+</button>
+                  <button
+                    onClick={() => setFreqZoomIdx(i => Math.min(ZOOM_LEVELS_FREQ.length - 1, i + 1))}
+                    disabled={freqZoomIdx === ZOOM_LEVELS_FREQ.length - 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                    title="Zoom out"
+                  >🔍−</button>
+                  <button
+                    onClick={() => setFreqZoomIdx(4)}
+                    className="ml-1 rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >Reset</button>
+                </div>
+              )}
             </div>
 
             {!results ? <EmptyPlot /> : (
