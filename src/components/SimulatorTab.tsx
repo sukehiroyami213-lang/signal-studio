@@ -323,8 +323,9 @@ const SimulatorTab = () => {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
                       <XAxis dataKey="time" tick={tickStyle} domain={[0, visibleTimeWindowMs]} type="number"
-                        label={{ value: activeSignalKey === "message" ? "Time (ms)" : "Time (ms, zoomed)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
-                      <YAxis tick={tickStyle} />
+                        label={{ value: "Time (ms)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
+                      <YAxis tick={tickStyle}
+                        label={{ value: "Amplitude (V)", angle: -90, position: "insideLeft", offset: 10, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
                       <Tooltip
                         contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 12 }}
                         labelStyle={{ color: "hsl(215,20%,55%)" }}
