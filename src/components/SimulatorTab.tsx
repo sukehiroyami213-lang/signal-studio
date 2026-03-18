@@ -103,8 +103,9 @@ const SimulatorTab = () => {
   const [Ac] = useState(10);
   const [simulated, setSimulated] = useState(false);
   const [activeTimePlot, setActiveTimePlot] = useState<number>(0);
-  const [timeZoomIdx, setTimeZoomIdx] = useState(2); // default index into zoom levels
-  const [freqZoomIdx, setFreqZoomIdx] = useState(4); // default: show all
+  const [timeZoomIdx, setTimeZoomIdx] = useState(2);
+  const [freqZoomIdx, setFreqZoomIdx] = useState(4);
+  const [spectrumView, setSpectrumView] = useState<"individual" | "overlay">("individual");
 
   const fs = 500000;
   const duration = 0.005;
@@ -341,35 +342,73 @@ const SimulatorTab = () => {
 
           {/* Frequency Spectrum */}
           <div className="rounded-xl border border-border/60 bg-card/80 p-5">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-sm">📡</div>
                 <h2 className="text-lg font-bold text-foreground">Frequency Spectrum</h2>
               </div>
-              {results && (
-                <div className="flex items-center gap-1">
-                  <span className="mr-1 text-[10px] text-muted-foreground">0–{freqZoomMax} kHz</span>
-                  <button
-                    onClick={() => setFreqZoomIdx(i => Math.max(0, i - 1))}
-                    disabled={freqZoomIdx === 0}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
-                    title="Zoom in"
-                  >🔍+</button>
-                  <button
-                    onClick={() => setFreqZoomIdx(i => Math.min(ZOOM_LEVELS_FREQ.length - 1, i + 1))}
-                    disabled={freqZoomIdx === ZOOM_LEVELS_FREQ.length - 1}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
-                    title="Zoom out"
-                  >🔍−</button>
-                  <button
-                    onClick={() => setFreqZoomIdx(4)}
-                    className="ml-1 rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >Reset</button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {results && (
+                  <>
+                    {/* View toggle */}
+                    <div className="flex rounded-lg bg-secondary/50 p-0.5">
+                      <button
+                        onClick={() => setSpectrumView("individual")}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all ${
+                          spectrumView === "individual" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >Individual</button>
+                      <button
+                        onClick={() => setSpectrumView("overlay")}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all ${
+                          spectrumView === "overlay" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >Overlay</button>
+                    </div>
+                    {/* Zoom controls */}
+                    <span className="text-[10px] text-muted-foreground">0–{freqZoomMax} kHz</span>
+                    <button onClick={() => setFreqZoomIdx(i => Math.max(0, i - 1))} disabled={freqZoomIdx === 0}
+                      className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30" title="Zoom in">🔍+</button>
+                    <button onClick={() => setFreqZoomIdx(i => Math.min(ZOOM_LEVELS_FREQ.length - 1, i + 1))} disabled={freqZoomIdx === ZOOM_LEVELS_FREQ.length - 1}
+                      className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30" title="Zoom out">🔍−</button>
+                    <button onClick={() => setFreqZoomIdx(4)}
+                      className="rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">Reset</button>
+                  </>
+                )}
+              </div>
             </div>
 
-            {!results ? <EmptyPlot /> : (
+            {!results ? <EmptyPlot /> : spectrumView === "overlay" ? (
+              /* Overlay view: all three spectrums on one chart */
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-lg bg-secondary/20 p-3">
+                <div className="mb-3 flex flex-wrap items-center gap-4">
+                  {SPECTRUM_CONFIGS.map(({ label, color }) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+                      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    </div>
+                  ))}
+                </div>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                    <XAxis dataKey="freq" tick={{ fontSize: 10, fill: "hsl(215,20%,45%)" }} type="number"
+                      domain={[0, freqZoomMax]} allowDataOverflow
+                      label={{ value: "Frequency (kHz)", position: "insideBottomRight", offset: -5, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
+                    <YAxis tick={{ fontSize: 10, fill: "hsl(215,20%,45%)" }}
+                      label={{ value: "|X(f)|", angle: -90, position: "insideLeft", offset: 10, fontSize: 10, fill: "hsl(215,20%,45%)" }} />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(222,47%,9%)", border: "1px solid hsl(222,30%,20%)", borderRadius: "8px", fontSize: 11 }}
+                    />
+                    {SPECTRUM_CONFIGS.map(({ key, color }) => (
+                      <Line key={key} data={spectrumToChart(results[key])} dataKey="mag" stroke={color}
+                        strokeWidth={2} dot={false} name={key} type="monotone" />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </motion.div>
+            ) : (
+              /* Individual view */
               <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
                 {SPECTRUM_CONFIGS.map(({ key, label, color }) => (
                   <motion.div key={key} className="rounded-lg bg-secondary/20 p-3"
