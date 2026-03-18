@@ -137,7 +137,9 @@ const SimulatorTab = () => {
   };
 
   const spectrumToChart = (spec: { freq: number[]; mag: number[] }) =>
-    spec.freq.map((f, i) => ({ freq: Math.round(f / 100) / 10, mag: Math.round(spec.mag[i] * 1000) / 1000 }));
+    spec.freq
+      .map((f, i) => ({ freq: Math.round(f / 100) / 10, mag: Math.round(spec.mag[i] * 1000) / 1000 }))
+      .filter(p => p.freq <= freqZoomMax);
 
   const gridStroke = "hsl(222,25%,16%)";
   const tickStyle = { fontSize: 10, fill: "hsl(215,20%,45%)" };
