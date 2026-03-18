@@ -271,12 +271,33 @@ const SimulatorTab = () => {
             {!results ? <EmptyPlot /> : (
               <AnimatePresence mode="wait">
                 <motion.div key={activeTimePlot} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
-                    <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
-                    <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Showing 0–{visibleTimeWindowMs} ms
-                    </span>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full" style={{ background: SIGNAL_CONFIGS[activeTimePlot].color }} />
+                      <span className="text-sm font-medium text-foreground">{SIGNAL_CONFIGS[activeTimePlot].label}</span>
+                      <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        0–{visibleTimeWindowMs} ms
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setTimeZoomIdx(i => Math.max(0, i - 1))}
+                        disabled={timeZoomIdx === 0}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                        title="Zoom in"
+                      >🔍+</button>
+                      <button
+                        onClick={() => setTimeZoomIdx(i => Math.min(zoomLevels.length - 1, i + 1))}
+                        disabled={timeZoomIdx === zoomLevels.length - 1}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary/60 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-30"
+                        title="Zoom out"
+                      >🔍−</button>
+                      <button
+                        onClick={() => setTimeZoomIdx(2)}
+                        className="ml-1 rounded-md bg-secondary/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        title="Reset zoom"
+                      >Reset</button>
+                    </div>
                   </div>
                   <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={activeTimeData}>
